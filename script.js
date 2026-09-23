@@ -70,33 +70,6 @@ $('#nameInput').addEventListener('input', (event) => { $('#conversation').innerH
 $('#wishForm').addEventListener('submit', async (event) => { event.preventDefault(); const submit = $('#wishForm button[type="submit"]'), name = $('#nameInput').value.trim(), message = $('#wishInput').value.trim(); if (!name || !message) return; submit.disabled = true; submit.textContent = 'Adding your wish…'; let audioPath = null; try { if (!supabaseClient) { throw new Error('Guestbook is unavailable.'); } if (voiceBlob) { audioPath = `${crypto.randomUUID()}.webm`; const { error } = await supabaseClient.storage.from('birthday-voices').upload(audioPath, voiceBlob, { contentType: 'audio/webm', upsert: false }); if (error) throw error; } const { error } = await supabaseClient.from('birthday_wishes').insert({ name, message, audio_path: audioPath }); if (error) throw error; await loadWishes(true); $('#wishForm').reset(); voiceBlob = null; $('#voicePreview').hidden = true; $('#recordButton').textContent = '◉ Add a voice note'; $('#conversation').innerHTML = '<p class="bot-line">Your wish is on the wall. Thank you for being part of my day!</p>'; confetti(); $('#giftPrompt').showModal(); } catch (error) { console.error(error); $('#conversation').innerHTML = '<p class="bot-line">I could not save that yet. Please try again after the guestbook setup is complete.</p>'; } finally { submit.disabled = false; submit.innerHTML = 'Add to card <span>↗</span>'; } });
 $('#recordButton').onclick = async () => { if (!navigator.mediaDevices) return alert('Voice recording is not supported in this browser.'); if (recorder?.state === 'recording') { recorder.stop(); return; } try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); recordChunks = []; recorder = new MediaRecorder(stream); recorder.ondataavailable = (event) => recordChunks.push(event.data); recorder.onstop = () => { voiceBlob = new Blob(recordChunks, { type: 'audio/webm' }); const preview = $('#voicePreview'); preview.src = URL.createObjectURL(voiceBlob); preview.hidden = false; $('#recordButton').textContent = '◉ Voice note attached'; $('#recordButton').classList.remove('recording'); stream.getTracks().forEach((track) => track.stop()); }; recorder.start(); $('#recordButton').textContent = '■ Stop recording'; $('#recordButton').classList.add('recording'); } catch { alert('Please allow microphone access to add a voice note.'); } };
 
-const backgroundMusic = $('#backgroundMusic'); const musicToggle = $('#musicToggle');
-backgroundMusic.volume = .22;
-backgroundMusic.muted = false;
-
-async function playBackgroundMusic() {
-  try {
-    await backgroundMusic.play();
-    musicToggle.textContent = '♫';
-    musicToggle.setAttribute('aria-label', 'Pause background music');
-    musicToggle.title = 'Pause background music';
-  } catch {
-    musicToggle.textContent = '▶';
-    musicToggle.setAttribute('aria-label', 'Play background music');
-    musicToggle.title = 'Play background music';
-  }
-}
-
-document.addEventListener('pointerdown', playBackgroundMusic, { once: true });
-document.addEventListener('keydown', playBackgroundMusic, { once: true });
-window.addEventListener('load', () => {
-  if (backgroundMusic.dataset.autoplay === 'true') {
-    playBackgroundMusic();
-  }
-}, { once: true });
-
-musicToggle.onclick = async () => { if (backgroundMusic.paused) { await playBackgroundMusic(); return; } backgroundMusic.pause(); musicToggle.textContent = '▶'; musicToggle.setAttribute('aria-label', 'Play background music'); musicToggle.title = 'Play background music'; };
-
 document.querySelectorAll('[data-share]').forEach((button) => { button.onclick = async () => { const url = location.href; if (button.dataset.share === 'copy') { await navigator.clipboard?.writeText(url); button.textContent = 'Copied!'; setTimeout(() => { button.textContent = 'Copy link'; }, 1200); } else if (button.dataset.share === 'whatsapp') open(`https://wa.me/?text=${encodeURIComponent(`Come celebrate with me! ${url}`)}`, '_blank'); else open(`https://twitter.com/intent/tweet?text=${encodeURIComponent('Come celebrate with me!')}&url=${encodeURIComponent(url)}`, '_blank'); }; });
 document.querySelectorAll('[data-copy-account]').forEach((button) => { button.onclick = async () => { await navigator.clipboard?.writeText(button.dataset.copyAccount); button.innerHTML = 'Account number copied <span>✓</span>'; setTimeout(() => { button.innerHTML = 'Copy account number <span>↗</span>'; }, 1600); }; });
 
