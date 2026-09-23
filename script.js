@@ -49,7 +49,9 @@ async function addHeart(wishId, button) {
 }
 function confetti() { const colors = ['var(--color-orange)', 'var(--color-white)', 'var(--color-orange-hover)']; for (let index = 0; index < 70; index += 1) { const piece = document.createElement('i'); piece.className = 'confetti'; piece.style.left = `${Math.random() * 100}vw`; piece.style.setProperty('--drift', `${Math.random() * 16 - 8}vw`); piece.style.background = colors[index % colors.length]; piece.style.animationDelay = `${Math.random() * .3}s`; $('.confetti-layer').append(piece); setTimeout(() => piece.remove(), 1000); } }
 async function hash(value) { const bytes = new TextEncoder().encode(value); const digest = await crypto.subtle.digest('SHA-256', bytes); return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join(''); }
-function unlockGallery() { const grid = $('#bentoGrid'); if (!grid.children.length) grid.append($('#galleryTemplate').content.cloneNode(true)); grid.hidden = false; $('#galleryGate').hidden = true; sessionStorage.setItem('birthdayGalleryUnlocked', 'true'); }
+function openGalleryViewer(tile) { const image = $('img', tile); const viewer = $('#galleryViewer'); $('#galleryViewerImage').src = image.currentSrc || image.src; $('#galleryViewerImage').alt = image.alt; $('#galleryViewerCaption').textContent = $('figcaption', tile).textContent; viewer.showModal(); }
+function setUpGalleryViewer() { document.querySelectorAll('#bentoGrid .bento-tile').forEach((tile) => { if (tile.dataset.viewerBound) return; tile.dataset.viewerBound = 'true'; tile.tabIndex = 0; tile.setAttribute('role', 'button'); tile.setAttribute('aria-label', `View photo: ${$('figcaption', tile).textContent}`); tile.addEventListener('click', () => openGalleryViewer(tile)); tile.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openGalleryViewer(tile); } }); }); }
+function unlockGallery() { const grid = $('#bentoGrid'); if (!grid.children.length) grid.append($('#galleryTemplate').content.cloneNode(true)); setUpGalleryViewer(); grid.hidden = false; $('#galleryGate').hidden = true; sessionStorage.setItem('birthdayGalleryUnlocked', 'true'); }
 if (sessionStorage.getItem('birthdayGalleryUnlocked') === 'true') unlockGallery();
 $('#galleryForm').addEventListener('submit', async (event) => { event.preventDefault(); const input = $('#galleryPasscode'); const error = $('#galleryError'); if (await hash(input.value) === galleryCodeHash) { unlockGallery(); return; } error.textContent = 'That passcode is not quite right. Please try again.'; input.select(); });
 
@@ -70,8 +72,11 @@ document.querySelectorAll('[data-copy-account]').forEach((button) => { button.on
 
 $('#celebrateButton').onclick = confetti;
 $('#dismissGiftPrompt').onclick = () => $('#giftPrompt').close();
-let exitPromptShown = false;
-document.addEventListener('mouseout', (event) => { if (exitPromptShown || event.relatedTarget || event.clientY > 0) return; exitPromptShown = true; $('#exitPrompt').showModal(); });
+$('#closeGalleryViewer').onclick = () => $('#galleryViewer').close();
+$('#galleryViewer').addEventListener('click', (event) => { if (event.target === $('#galleryViewer')) $('#galleryViewer').close(); });
+let exitPromptShown = false, exitPromptArmed = false;
+setTimeout(() => { exitPromptArmed = true; }, 1500);
+document.addEventListener('pointerout', (event) => { const leavingFromTop = !event.relatedTarget && event.clientY <= 0; if (!exitPromptArmed || exitPromptShown || event.pointerType !== 'mouse' || !leavingFromTop || document.visibilityState !== 'visible') return; exitPromptShown = true; $('#exitPrompt').showModal(); });
 $('#stayOnPage').onclick = () => $('#exitPrompt').close();
 new IntersectionObserver(([entry]) => { if (entry.isIntersecting) loadWishes(); }, { rootMargin: '360px' }).observe($('#wishSentinel'));
 supabaseClient.channel('birthday-live-updates').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'birthday_wishes' }, () => loadWishes(true)).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'birthday_reactions' }, () => loadWishes(true)).subscribe();
