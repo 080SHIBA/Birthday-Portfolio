@@ -1,0 +1,4 @@
+const gifts = { coffee: ['Coffee cheers!', 'A ₦2,000 coffee is a sweet way to celebrate with me.'], lunch: ['Lunch is on you!', 'A ₦5,000 birthday lunch would make my day.'], cake: ['Save me a slice.', 'A ₦10,000 cake contribution makes every candle brighter.'], surprise: ['What a lovely surprise.', 'Any amount and every good thought means a lot to me.'] };
+const tier = new URLSearchParams(location.search).get('tier');
+if (gifts[tier]) { document.querySelector('#giftTitle').textContent = gifts[tier][0]; document.querySelector('#giftMessage').textContent = gifts[tier][1]; }
+document.querySelector('[data-copy-account]').onclick = async (event) => { const button = event.currentTarget; await navigator.clipboard?.writeText(button.dataset.copyAccount); button.innerHTML = 'Account number copied <span>✓</span>'; setTimeout(() => { button.innerHTML = 'Copy account number <span>↗</span>'; }, 1600); };

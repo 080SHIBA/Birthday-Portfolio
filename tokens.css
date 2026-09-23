@@ -1,0 +1,31 @@
+/* Hallmark · token system · custom midnight ember */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Pacifico&display=swap');
+
+:root {
+  --color-bg: oklch(15% 0.006 47);
+  --color-surface: oklch(18% 0.006 47);
+  --color-card: oklch(22% 0.006 47);
+  --color-card-raised: oklch(26% 0.006 47);
+  --color-orange: oklch(65% 0.22 47);
+  --color-orange-hover: oklch(73% 0.19 58);
+  --color-white: oklch(100% 0.006 47);
+  --color-muted: oklch(78% 0.006 47);
+  --color-faint: oklch(57% 0.006 47);
+  --color-rule: oklch(100% 0.006 47 / 8%);
+  --color-shadow: oklch(0% 0.006 47 / 42%);
+  --color-focus: oklch(77% 0.17 63);
+  --color-accent-ink: oklch(15% 0.006 47);
+  --color-orange-glow: oklch(65% 0.22 47 / 22%);
+  --font-display: 'Manrope', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-script: 'Pacifico', cursive;
+  --space-1: .25rem; --space-2: .5rem; --space-3: .75rem; --space-4: 1rem;
+  --space-5: 1.25rem; --space-6: 1.5rem; --space-8: 2rem; --space-10: 2.5rem;
+  --space-12: 3rem; --space-16: 4rem; --space-20: 5rem; --space-24: 6rem;
+  --text-xs: .72rem; --text-sm: .875rem; --text-base: 1rem; --text-lg: 1.2rem;
+  --text-xl: 1.5rem; --text-2xl: 2rem; --text-display: clamp(3.25rem, 7vw, 7rem);
+  --radius-sm: .5rem; --radius-md: 1rem; --radius-lg: 1.5rem; --radius-xl: 2rem;
+  --rule: 1px solid var(--color-rule);
+  --dur-fast: 150ms; --dur-med: 280ms; --dur-slow: 700ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1); --ease-in: cubic-bezier(.55, 0, 1, .45); --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+}
