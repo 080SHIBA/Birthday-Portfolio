@@ -77,9 +77,14 @@ $('#celebrateButton').onclick = confetti;
 $('#dismissGiftPrompt').onclick = () => $('#giftPrompt').close();
 $('#closeGalleryViewer').onclick = () => $('#galleryViewer').close();
 $('#galleryViewer').addEventListener('click', (event) => { if (event.target === $('#galleryViewer')) $('#galleryViewer').close(); });
-let exitPromptShown = false, exitPromptArmed = false;
-setTimeout(() => { exitPromptArmed = true; }, 1500);
-document.addEventListener('pointerout', (event) => { const leavingFromTop = !event.relatedTarget && event.clientY <= 0; if (!exitPromptArmed || exitPromptShown || event.pointerType !== 'mouse' || !leavingFromTop || document.visibilityState !== 'visible') return; exitPromptShown = true; $('#exitPrompt').showModal(); });
+let exitPromptShown = false;
+const showExitPrompt = () => {
+  if (exitPromptShown) return;
+  exitPromptShown = true;
+  $('#exitPrompt').showModal();
+};
+$('#galleryPasscode').addEventListener('pointerdown', showExitPrompt);
+$('#galleryPasscode').addEventListener('focus', showExitPrompt);
 $('#stayOnPage').onclick = () => $('#exitPrompt').close();
 new IntersectionObserver(([entry]) => { if (entry.isIntersecting) loadWishes(); }, { rootMargin: '360px' }).observe($('#wishSentinel'));
 if (supabaseClient) {
