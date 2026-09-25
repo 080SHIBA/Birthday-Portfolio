@@ -8,6 +8,7 @@ const visitorId = localStorage.getItem('birthdayVisitorId') || crypto.randomUUID
 localStorage.setItem('birthdayVisitorId', visitorId);
 const hearted = new Set(JSON.parse(localStorage.getItem('heartedBirthdayWishes') || '[]'));
 const galleryCodeHash = '24e4762ee5def527869d188dbccaac88424bcac95b9efce7765b1bc5bcba30b3';
+const galleryPasscodeValue = '15091974';
 const guestbookEnabled = Boolean(supabaseClient);
 
 const target = new Date(new Date().getFullYear(), 8, 26);
@@ -78,6 +79,13 @@ $('#dismissGiftPrompt').onclick = () => $('#giftPrompt').close();
 $('#closeGalleryViewer').onclick = () => $('#galleryViewer').close();
 $('#galleryViewer').addEventListener('click', (event) => { if (event.target === $('#galleryViewer')) $('#galleryViewer').close(); });
 let exitPromptShown = false;
+const revealPasscode = () => {
+  const reveal = $('#passcodeReveal');
+  const value = $('#passcodeValue');
+  if (!reveal || !value) return;
+  value.textContent = galleryPasscodeValue;
+  reveal.hidden = false;
+};
 const showExitPrompt = () => {
   if (exitPromptShown) return;
   exitPromptShown = true;
@@ -85,7 +93,19 @@ const showExitPrompt = () => {
 };
 $('#galleryPasscode').addEventListener('pointerdown', showExitPrompt);
 $('#galleryPasscode').addEventListener('focus', showExitPrompt);
-$('#stayOnPage').onclick = () => $('#exitPrompt').close();
+$('#exitPrompt').addEventListener('click', (event) => { if (event.target === $('#exitPrompt')) $('#exitPrompt').close(); });
+$('#stayOnPage').onclick = () => revealPasscode();
+$('#copyPasscodeFromPrompt').onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(galleryPasscodeValue);
+    const copyButton = $('#copyPasscodeFromPrompt');
+    const original = copyButton.textContent;
+    copyButton.textContent = '✓';
+    setTimeout(() => { copyButton.textContent = original; }, 1200);
+  } catch (error) {
+    console.error(error);
+  }
+};
 new IntersectionObserver(([entry]) => { if (entry.isIntersecting) loadWishes(); }, { rootMargin: '360px' }).observe($('#wishSentinel'));
 if (supabaseClient) {
   supabaseClient.channel('birthday-live-updates').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'birthday_wishes' }, () => loadWishes(true)).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'birthday_reactions' }, () => loadWishes(true)).subscribe();
