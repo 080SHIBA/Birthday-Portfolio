@@ -9,6 +9,8 @@ localStorage.setItem('birthdayVisitorId', visitorId);
 const hearted = new Set(JSON.parse(localStorage.getItem('heartedBirthdayWishes') || '[]'));
 const galleryCodeHash = '24e4762ee5def527869d188dbccaac88424bcac95b9efce7765b1bc5bcba30b3';
 const galleryPasscodeValue = '15091974';
+const galleryPromptCooldownMs = 30_000;
+let lastGalleryPromptAt = 0;
 const guestbookEnabled = Boolean(supabaseClient);
 
 const target = new Date(new Date().getFullYear(), 8, 26);
@@ -63,7 +65,7 @@ function confetti() { const colors = ['var(--color-orange)', 'var(--color-white)
 async function hash(value) { const bytes = new TextEncoder().encode(value); const digest = await crypto.subtle.digest('SHA-256', bytes); return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join(''); }
 function openGalleryViewer(tile) { const image = $('img', tile); const viewer = $('#galleryViewer'); $('#galleryViewerImage').src = image.currentSrc || image.src; $('#galleryViewerImage').alt = image.alt; $('#galleryViewerCaption').textContent = $('figcaption', tile).textContent; viewer.showModal(); }
 function setUpGalleryViewer() { document.querySelectorAll('#bentoGrid .bento-tile').forEach((tile) => { if (tile.dataset.viewerBound) return; tile.dataset.viewerBound = 'true'; tile.tabIndex = 0; tile.setAttribute('role', 'button'); tile.setAttribute('aria-label', `View photo: ${$('figcaption', tile).textContent}`); tile.addEventListener('click', () => openGalleryViewer(tile)); tile.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openGalleryViewer(tile); } }); }); }
-function unlockGallery() { const grid = $('#bentoGrid'); if (!grid.children.length) grid.append($('#galleryTemplate').content.cloneNode(true)); setUpGalleryViewer(); grid.hidden = false; $('#galleryGate').hidden = true; sessionStorage.setItem('birthdayGalleryUnlocked', 'true'); }
+function unlockGallery() { const grid = $('#bentoGrid'); if (!grid.children.length) grid.append($('#galleryTemplate').content.cloneNode(true)); setUpGalleryViewer(); grid.hidden = false; $('#galleryGate').hidden = true; sessionStorage.setItem('birthdayGalleryUnlocked', 'true'); const prompt = $('#exitPrompt'); if (prompt && prompt.open) prompt.close(); }
 if (sessionStorage.getItem('birthdayGalleryUnlocked') === 'true') unlockGallery();
 $('#galleryForm').addEventListener('submit', async (event) => { event.preventDefault(); const input = $('#galleryPasscode'); const error = $('#galleryError'); if (await hash(input.value) === galleryCodeHash) { unlockGallery(); return; } error.textContent = 'That passcode is not quite right. Please try again.'; input.select(); });
 
@@ -78,7 +80,6 @@ $('#celebrateButton').onclick = confetti;
 $('#dismissGiftPrompt').onclick = () => $('#giftPrompt').close();
 $('#closeGalleryViewer').onclick = () => $('#galleryViewer').close();
 $('#galleryViewer').addEventListener('click', (event) => { if (event.target === $('#galleryViewer')) $('#galleryViewer').close(); });
-let exitPromptShown = false;
 const revealPasscode = () => {
   const reveal = $('#passcodeReveal');
   const value = $('#passcodeValue');
@@ -86,18 +87,35 @@ const revealPasscode = () => {
   value.textContent = galleryPasscodeValue;
   reveal.hidden = false;
 };
+const startGalleryPromptCooldown = () => {
+  lastGalleryPromptAt = Date.now();
+};
 const showExitPrompt = () => {
-  if (exitPromptShown) return;
-  exitPromptShown = true;
-  $('#exitPrompt').showModal();
+  const prompt = $('#exitPrompt');
+  const galleryUnlocked = sessionStorage.getItem('birthdayGalleryUnlocked') === 'true';
+  const now = Date.now();
+  if (galleryUnlocked || prompt.open) return;
+  if (lastGalleryPromptAt && now - lastGalleryPromptAt < galleryPromptCooldownMs) return;
+  prompt.showModal();
 };
 $('#galleryPasscode').addEventListener('pointerdown', showExitPrompt);
 $('#galleryPasscode').addEventListener('focus', showExitPrompt);
-$('#exitPrompt').addEventListener('click', (event) => { if (event.target === $('#exitPrompt')) $('#exitPrompt').close(); });
-$('#stayOnPage').onclick = () => revealPasscode();
+$('#exitPrompt').addEventListener('click', (event) => {
+  if (event.target === $('#exitPrompt')) {
+    $('#exitPrompt').close();
+    $('#galleryPasscode').blur();
+  }
+});
+$('#exitPrompt').addEventListener('close', () => {
+  $('#galleryPasscode').blur();
+});
+$('#stayOnPage').onclick = () => {
+  revealPasscode();
+};
 $('#copyPasscodeFromPrompt').onclick = async () => {
   try {
     await navigator.clipboard.writeText(galleryPasscodeValue);
+    startGalleryPromptCooldown();
     const copyButton = $('#copyPasscodeFromPrompt');
     const original = copyButton.textContent;
     copyButton.textContent = '✓';
