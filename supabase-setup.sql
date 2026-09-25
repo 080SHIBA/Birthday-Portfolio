@@ -36,6 +36,20 @@ drop policy if exists "Anyone can add one birthday reaction" on public.birthday_
 create policy "Anyone can view birthday reactions" on public.birthday_reactions for select to anon using (true);
 create policy "Anyone can add one birthday reaction" on public.birthday_reactions for insert to anon with check (true);
 
+create table if not exists public.birthday_comments (
+  id uuid primary key default gen_random_uuid(),
+  wish_id uuid not null references public.birthday_wishes(id) on delete cascade,
+  name text not null default 'Visitor' check (char_length(name) between 1 and 30),
+  message text not null check (char_length(message) between 1 and 160),
+  created_at timestamptz not null default now()
+);
+alter table public.birthday_comments enable row level security;
+grant select, insert on public.birthday_comments to anon;
+drop policy if exists "Anyone can view birthday comments" on public.birthday_comments;
+drop policy if exists "Anyone can add birthday comments" on public.birthday_comments;
+create policy "Anyone can view birthday comments" on public.birthday_comments for select to anon using (true);
+create policy "Anyone can add birthday comments" on public.birthday_comments for insert to anon with check (char_length(message) between 1 and 160 and char_length(name) between 1 and 30);
+
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('birthday-voices', 'birthday-voices', true, 5242880, array['audio/webm']) on conflict (id) do nothing;
 drop policy if exists "Anyone can read birthday voice notes" on storage.objects;
@@ -45,3 +59,4 @@ create policy "Anyone can add birthday voice notes" on storage.objects for inser
 
 do $$ begin alter publication supabase_realtime add table public.birthday_wishes; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table public.birthday_reactions; exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table public.birthday_comments; exception when duplicate_object then null; end $$;

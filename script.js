@@ -12,6 +12,14 @@ const galleryPasscodeValue = '15091974';
 const galleryPromptCooldownMs = 30_000;
 let lastGalleryPromptAt = 0;
 const guestbookEnabled = Boolean(supabaseClient);
+const notificationsEnabled = () => 'Notification' in window && Notification.permission === 'granted';
+const showBrowserNotification = (message) => {
+  if (!notificationsEnabled()) return;
+  new Notification('Birthday guestbook', {
+    body: message,
+    tag: 'birthday-guestbook-comment'
+  });
+};
 
 const target = new Date(new Date().getFullYear(), 8, 26);
 if (target < new Date()) target.setFullYear(target.getFullYear() + 1);
@@ -21,13 +29,36 @@ tick(); setInterval(tick, 1000);
 function audioUrl(path) { return path && supabaseClient ? supabaseClient.storage.from('birthday-voices').getPublicUrl(path).data.publicUrl : null; }
 function saveHearts() { localStorage.setItem('heartedBirthdayWishes', JSON.stringify([...hearted])); }
 function animateIn(card) { requestAnimationFrame(() => card.classList.add('is-visible')); }
-function renderWish(wish, heartCount = 0) {
+function renderWish(wish, heartCount = 0, comments = []) {
   const item = $('#wishTemplate').content.cloneNode(true);
   const card = $('.wish-card', item), heart = $('.heart-button', item);
+  const commentsList = $('.wish-comments-list', item);
+  const commentForm = $('.wish-comment-form', item);
   card.dataset.wishId = wish.id;
   $('.wish-initial', item).textContent = wish.name[0].toUpperCase(); $('.wish-name', item).textContent = wish.name; $('.wish-text', item).textContent = wish.message;
   const date = new Date(wish.created_at); $('time', item).textContent = Number.isNaN(date.valueOf()) ? 'just now' : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   if (wish.audio_path) { const player = $('.wish-audio', item); player.src = audioUrl(wish.audio_path); player.hidden = false; }
+  commentsList.innerHTML = '';
+  if (!comments.length) {
+    const empty = document.createElement('li');
+    empty.className = 'wish-comment-empty';
+    empty.textContent = 'No comments yet.';
+    commentsList.appendChild(empty);
+  } else {
+    comments.forEach((comment) => {
+      const commentItem = document.createElement('li');
+      const commentName = document.createElement('span');
+      const commentText = document.createElement('p');
+      commentItem.className = 'wish-comment-item';
+      commentName.className = 'wish-comment-name';
+      commentName.textContent = comment.name || 'Visitor';
+      commentText.textContent = comment.message;
+      commentItem.append(commentName, commentText);
+      commentsList.appendChild(commentItem);
+    });
+  }
+  commentForm.dataset.wishId = wish.id;
+  commentForm.addEventListener('submit', handleWishCommentSubmit);
   $('.heart-count', item).textContent = heartCount; heart.classList.toggle('is-hearted', hearted.has(wish.id)); heart.setAttribute('aria-pressed', String(hearted.has(wish.id)));
   heart.addEventListener('click', () => addHeart(wish.id, heart));
   $('#wishWall').append(item); animateIn($('#wishWall').lastElementChild);
@@ -42,6 +73,16 @@ async function updateTotal() {
   const { count } = await supabaseClient.from('birthday_wishes').select('*', { count: 'exact', head: true });
   if (count !== null) { $('#wishTotal').textContent = count; $('#wishMessageTotal').textContent = count; }
 }
+async function getCommentsByWish(ids) {
+  if (!ids.length || !supabaseClient) return new Map();
+  const { data } = await supabaseClient.from('birthday_comments').select('id, wish_id, name, message, created_at').in('wish_id', ids).order('created_at', { ascending: true });
+  return (data || []).reduce((commentsMap, comment) => {
+    const list = commentsMap.get(comment.wish_id) || [];
+    list.push(comment);
+    commentsMap.set(comment.wish_id, list);
+    return commentsMap;
+  }, new Map());
+}
 async function loadWishes(reset = false) {
   if (!guestbookEnabled) {
     $('#wishWall').innerHTML = '<p class="wall-status">The guestbook is temporarily offline. The rest of the birthday page is still working.</p>';
@@ -51,7 +92,24 @@ async function loadWishes(reset = false) {
   if (reset) { offset = 0; hasMore = true; $('#wishWall').innerHTML = ''; }
   const { data, error } = await supabaseClient.from('birthday_wishes').select('id, name, message, audio_path, created_at').order('created_at', { ascending: false }).range(offset, offset + pageSize - 1);
   if (error) { $('#wishWall').innerHTML = '<p class="wall-status">The guestbook is getting ready. Run the setup SQL, then refresh this page.</p>'; console.error(error); loadingWishes = false; return; }
-  const hearts = await getHeartCounts(data.map((wish) => wish.id)); data.forEach((wish) => renderWish(wish, hearts.get(wish.id) || 0)); offset += data.length; hasMore = data.length === pageSize; loadingWishes = false; updateTotal();
+  const hearts = await getHeartCounts(data.map((wish) => wish.id));
+  const commentsByWish = await getCommentsByWish(data.map((wish) => wish.id));
+  data.forEach((wish) => renderWish(wish, hearts.get(wish.id) || 0, commentsByWish.get(wish.id) || [])); offset += data.length; hasMore = data.length === pageSize; loadingWishes = false; updateTotal();
+}
+async function handleWishCommentSubmit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const input = $('.wish-comment-input', form);
+  const message = input.value.trim();
+  if (!message || !supabaseClient) return;
+  const wishId = form.dataset.wishId;
+  const { error } = await supabaseClient.from('birthday_comments').insert({ wish_id: wishId, name: 'Visitor', message: message.slice(0, 160) });
+  if (error) {
+    console.error(error);
+    return;
+  }
+  form.reset();
+  await loadWishes(true);
 }
 async function addHeart(wishId, button) {
   if (!supabaseClient || hearted.has(wishId)) return;
@@ -77,6 +135,25 @@ document.querySelectorAll('[data-share]').forEach((button) => { button.onclick =
 document.querySelectorAll('[data-copy-account]').forEach((button) => { button.onclick = async () => { await navigator.clipboard?.writeText(button.dataset.copyAccount); button.innerHTML = 'Account number copied <span>✓</span>'; setTimeout(() => { button.innerHTML = 'Copy account number <span>↗</span>'; }, 1600); }; });
 
 $('#celebrateButton').onclick = confetti;
+const enableNotificationsButton = $('#enableNotificationsButton');
+if (enableNotificationsButton) {
+  if (!('Notification' in window)) {
+    enableNotificationsButton.hidden = true;
+  } else if (Notification.permission === 'granted') {
+    enableNotificationsButton.textContent = 'Notifications enabled';
+    enableNotificationsButton.disabled = true;
+  }
+  enableNotificationsButton.addEventListener('click', async () => {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') return;
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      enableNotificationsButton.textContent = 'Notifications enabled';
+      enableNotificationsButton.disabled = true;
+      showBrowserNotification('Notifications are now enabled for new comments.');
+    }
+  });
+}
 $('#dismissGiftPrompt').onclick = () => $('#giftPrompt').close();
 $('#closeGalleryViewer').onclick = () => $('#galleryViewer').close();
 $('#galleryViewer').addEventListener('click', (event) => { if (event.target === $('#galleryViewer')) $('#galleryViewer').close(); });
@@ -126,6 +203,9 @@ $('#copyPasscodeFromPrompt').onclick = async () => {
 };
 new IntersectionObserver(([entry]) => { if (entry.isIntersecting) loadWishes(); }, { rootMargin: '360px' }).observe($('#wishSentinel'));
 if (supabaseClient) {
-  supabaseClient.channel('birthday-live-updates').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'birthday_wishes' }, () => loadWishes(true)).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'birthday_reactions' }, () => loadWishes(true)).subscribe();
+  supabaseClient.channel('birthday-live-updates').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'birthday_wishes' }, () => loadWishes(true)).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'birthday_reactions' }, () => loadWishes(true)).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'birthday_comments' }, () => {
+    loadWishes(true);
+    showBrowserNotification('Someone just left a comment on a birthday wish.');
+  }).subscribe();
 }
 loadWishes(true); setTimeout(confetti, 350);
