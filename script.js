@@ -101,11 +101,20 @@ async function handleWishCommentSubmit(event) {
   const form = event.currentTarget;
   const input = $('.wish-comment-input', form);
   const message = input.value.trim();
-  if (!message || !supabaseClient) return;
+  if (!message) return;
+  if (!supabaseClient) {
+    input.value = '';
+    input.placeholder = 'Guestbook is unavailable right now.';
+    return;
+  }
   const wishId = form.dataset.wishId;
   const { error } = await supabaseClient.from('birthday_comments').insert({ wish_id: wishId, name: 'Visitor', message: message.slice(0, 160) });
   if (error) {
     console.error(error);
+    const detail = /does not exist|relation .*birthday_comments/i.test(error.message) ? 'Run the SQL in supabase-setup.sql to create the comments table.' : 'Your comment could not be sent right now. Please try again.';
+    input.value = '';
+    input.placeholder = detail;
+    input.focus();
     return;
   }
   form.reset();
