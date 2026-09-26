@@ -24,7 +24,7 @@ const showBrowserNotification = (message) => {
 const target = new Date(new Date().getFullYear(), 8, 26);
 if (target < new Date()) target.setFullYear(target.getFullYear() + 1);
 function tick() { const remaining = Math.max(0, target - new Date()); [['days', 864e5], ['hours', 36e5], ['minutes', 6e4], ['seconds', 1e3]].forEach(([id, unit], index) => { const value = index ? Math.floor(remaining / unit) % [24, 60, 60][index - 1] : Math.floor(remaining / unit); $(`#${id}`).textContent = String(value).padStart(2, '0'); }); }
-tick(); setInterval(tick, 1000);
+tick();
 
 function audioUrl(path) { return path && supabaseClient ? supabaseClient.storage.from('birthday-voices').getPublicUrl(path).data.publicUrl : null; }
 function saveHearts() { localStorage.setItem('heartedBirthdayWishes', JSON.stringify([...hearted])); }
